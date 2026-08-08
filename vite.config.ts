@@ -18,6 +18,7 @@ export default defineConfig(() => {
       watch: process.env.DISABLE_HMR === 'true' ? null : {},
     },
     build: {
+      chunkSizeWarningLimit: 1000,
       cssMinify: true,
       minify: 'esbuild',
       rollupOptions: {

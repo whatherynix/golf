@@ -47,7 +47,7 @@ echo -e "${PURPLE}==============================================================
 echo -e "${CYAN}    Golf Town Store Credit Portal — Launching on Termux/Android${NC}"
 echo -e "${PURPLE}==============================================================================${NC}"
 
-# Check if build exists
+# Check if build exists (Re-enabled for prod-like build)
 if [ ! -f "dist/server.cjs" ]; then
     echo -e "${YELLOW}[!] Compiled bundle dist/server.cjs missing. Running 'npm run build' first...${NC}"
     npm run build
@@ -55,13 +55,15 @@ fi
 
 # Locate node binary
 NODE_BIN=$(command -v node)
-if [ -z "$NODE_BIN" ]; then
-    echo -e "${RED}[!] Node.js binary not found.${NC}"
+NPM_BIN=$(command -v npm)
+if [ -z "$NODE_BIN" ] || [ -z "$NPM_BIN" ]; then
+    echo -e "${RED}[!] Node.js or NPM binary not found.${NC}"
     exit 1
 fi
 
 echo -e "${BLUE}[1/2] Starting Node.js backend server on http://127.0.0.1:3000...${NC}"
-$NODE_BIN dist/server.cjs > server.log 2>&1 &
+# Use npm run start to start the server directly
+npm run start > server.log 2>&1 &
 SERVER_PID=$!
 
 sleep 2
