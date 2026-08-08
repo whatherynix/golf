@@ -1,4 +1,5 @@
 import React, { useState, useMemo, useEffect, useRef } from 'react';
+import { MobileBottomNav } from './components/MobileBottomNav';
 import { CustomerRecord, FilterGender, StoreLocation } from './types';
 import { INITIAL_CUSTOMERS, guessGender } from './data/initialData';
 import { sanitizeCustomerRecords } from './data/dataSanitizer';
@@ -1905,6 +1906,8 @@ export default function App() {
           </div>
         </div>
       )}
+      {/* Mobile Bottom Navigation */}
+      <MobileBottomNav activeTab={mobileTab} onTabChange={setMobileTab} />
     </div>
   );
 }
