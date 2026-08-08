@@ -18,8 +18,12 @@ RED='\033[0;31m'
 NC='\033[0m' # No Color
 BOLD='\033[1m'
 
-print_header() {
+clear_screen() {
     clear
+}
+
+print_header() {
+    clear_screen
     echo -e "${PURPLE}==============================================================================${NC}"
     echo -e "${CYAN}   ███████╗███╗   ██╗██╗    ██████╗  ██████╗  ██████╗ ████████╗              ${NC}"
     echo -e "${CYAN}   ██╔════╝████╗  ██║██║    ██╔══██╗██╔═══██╗██╔═══██╗╚══██╔══╝              ${NC}"
@@ -56,19 +60,32 @@ print_termux() {
 
 # Install essential package dependencies
 install_packages() {
-    echo -e "${BLUE}[*] Installing required packages: Node.js, Git, OpenSSL, curl, build-essential...${NC}"
-    pkg update -y || true
-    pkg install -y nodejs-lts git openssl-tool curl build-essential -y || {
-        echo -e "${YELLOW}[!] Standard installation had errors. Trying individual installs...${NC}"
-        pkg install -y nodejs-lts -y
-        pkg install -y git -y
-        pkg install -y openssl-tool -y
-        pkg install -y curl -y
-    }
+    print_header
+    echo -e "${BLUE}[*] Installing/Verifying required packages: Node.js LTS, Git, OpenSSL, curl, build-essential...${NC}"
+    
+    # Update first
+    if ! pkg update -y; then
+        echo -e "${RED}[!] Failed to update package lists. Check your internet connection.${NC}"
+        exit 1
+    fi
 
+    # Install packages with retry mechanism
+    local packages=("nodejs-lts" "git" "openssl-tool" "curl" "build-essential" "python" "make")
+    for pkg in "${packages[@]}"; do
+        echo -e "${BLUE}[*] Installing $pkg...${NC}"
+        if ! pkg install -y "$pkg"; then
+            echo -e "${YELLOW}[!] Failed to install $pkg. Retrying once...${NC}"
+            sleep 2
+            if ! pkg install -y "$pkg"; then
+                echo -e "${RED}[!] Critical: Could not install $pkg. Installation cannot continue.${NC}"
+                exit 1
+            fi
+        fi
+    done
+    
     echo -e "${GREEN}[✔] Packages verified successfully!${NC}"
-    echo -e "${CYAN}    Node.js version: $(node -v)${NC}"
-    echo -e "${CYAN}    NPM version:    $(npm -v)${NC}"
+    echo -e "${CYAN}    Node.js version: $(node -v || echo "Unknown")${NC}"
+    echo -e "${CYAN}    NPM version:    $(npm -v || echo "Unknown")${NC}"
     echo ""
 }
 
@@ -109,20 +126,31 @@ install_cloudflared() {
 
 # Setup and compile application
 setup_app() {
+    print_header
     echo -e "${BLUE}[*] Preparing Node.js application directory...${NC}"
     
-    if [ -f "package.json" ]; then
-        echo -e "${GREEN}[✔] Found Golf Town codebase in local directory.${NC}"
-    else
-        echo -e "${YELLOW}[!] package.json not found in current directory.${NC}"
+    if [ ! -f "package.json" ]; then
+        echo -e "${RED}[!] package.json not found! Ensure you are in the project root.${NC}"
+        exit 1
     fi
 
-    echo -e "${BLUE}[*] Installing Node dependencies (optimized for Termux memory limits)...${NC}"
-    npm install --no-audit --no-fund --legacy-peer-deps
+    echo -e "${BLUE}[*] Installing Node dependencies...${NC}"
+    # Added --unsafe-perm for better compatibility with non-root Termux
+    if ! npm install --no-audit --no-fund --legacy-peer-deps --unsafe-perm; then
+        echo -e "${YELLOW}[!] npm install failed. Retrying...${NC}"
+        rm -rf node_modules package-lock.json
+        if ! npm install --no-audit --no-fund --legacy-peer-deps --unsafe-perm; then
+            echo -e "${RED}[!] Critical: npm install failed after retry.${NC}"
+            exit 1
+        fi
+    fi
 
     echo -e "${BLUE}[*] Compiling server and client assets (npm run build)...${NC}"
-    npm run build
-
+    # Use npx to ensure esbuild runs with the correct Node environment
+    if ! (npm run build || npx esbuild server.ts --bundle --platform=node --format=cjs --packages=external --sourcemap --outdir=dist --out-extension:.js=.cjs); then
+        echo -e "${RED}[!] Build failed. Check the errors above.${NC}"
+        exit 1
+    fi
     echo -e "${GREEN}[✔] Application setup and build complete!${NC}"
     echo ""
 }
